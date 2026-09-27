@@ -12,7 +12,7 @@ import streamlit as st
 import torch
 from transformers import AutoModelForSequenceClassification, AutoTokenizer
 
-APP_VERSION="1.0"
+APP_VERSION="1.1"
 APP_DIR=Path(__file__).resolve().parent
 MODEL_NAME="MoritzLaurer/mDeBERTa-v3-base-mnli-xnli"
 VISUAL_FILE=APP_DIR/"H1_confirmation_21_CLIP_42trait_FROZEN.csv"
@@ -46,6 +46,83 @@ def load_mapping():
 def bkey(s):
     s=str(s).strip().casefold().replace("ö","o")
     return re.sub(r"[^0-9a-z가-힣]+","",s)
+
+def infer_language(text):
+    """Script-based auxiliary metadata; never used to select or score text."""
+    has_korean=bool(re.search(r"[가-힣ㄱ-ㅎㅏ-ㅣᄀ-ᇿ]",str(text)))
+    has_latin=bool(re.search(r"[A-Za-z]",str(text)))
+    if has_korean and has_latin:
+        return "mixed"
+    if has_korean:
+        return "ko"
+    if has_latin:
+        return "en"
+    return "und"
+
+def prepare_corpus(data):
+    """Accept current/legacy columns without splitting or deduplicating units."""
+    corpus=data.copy()
+    corpus.columns=[str(col).replace("\ufeff","").strip() for col in corpus.columns]
+    if corpus.columns.duplicated().any():
+        raise ValueError("같은 이름의 열이 중복되어 있습니다. CSV 열 이름을 확인하세요.")
+
+    info={"Input_Units":len(corpus),"Legacy_Columns_Mapped":{},"Excluded_Unapproved_Units":0}
+    for old,new in (("Sentence_Unit_ID","Unit_ID"),("Sentence_Text","Text")):
+        if old not in corpus.columns:
+            continue
+        if new in corpus.columns:
+            current=corpus[new].fillna("").astype(str)
+            legacy=corpus[old].fillna("").astype(str)
+            conflict=(current.str.strip().ne("") & legacy.str.strip().ne("")
+                      & current.str.strip().ne(legacy.str.strip()))
+            if conflict.any():
+                raise ValueError(f"{new}와 {old} 값이 서로 다른 행이 있습니다. 사용할 값을 확인하세요.")
+            corpus[new]=current.where(current.str.strip().ne(""),legacy)
+            corpus=corpus.drop(columns=[old])
+        else:
+            corpus=corpus.rename(columns={old:new})
+        info["Legacy_Columns_Mapped"][old]=new
+
+    missing={"Brand","Unit_ID","Text"}-set(corpus.columns)
+    if missing:
+        raise ValueError(f"필수 열 누락: {sorted(missing)}. 필수열은 Brand, Unit_ID, Text입니다.")
+
+    # Preserve the researcher's existing decisions; do not reclassify content.
+    if "Researcher_Final" in corpus.columns:
+        decisions=corpus["Researcher_Final"].fillna("").astype(str).str.strip()
+        numeric=pd.to_numeric(decisions,errors="coerce")
+        invalid=decisions.ne("") & ~numeric.isin([0,1])
+        if invalid.any():
+            raise ValueError("Researcher_Final에는 0, 1 또는 빈칸만 사용할 수 있습니다.")
+        approved=numeric.eq(1)
+        info["Excluded_Unapproved_Units"]=int((~approved).sum())
+        corpus=corpus.loc[approved].copy()
+
+    if corpus.empty:
+        raise ValueError("분석할 Content Unit이 없습니다. 승인 데이터와 Researcher_Final 값을 확인하세요.")
+    for column in ("Brand","Unit_ID","Text"):
+        values=corpus[column].fillna("").astype(str)
+        if values.str.strip().eq("").any():
+            raise ValueError(f"{column}에 빈 값이 있습니다. 분석할 Content Unit의 값을 확인하세요.")
+        corpus[column]=values if column=="Text" else values.str.strip()
+
+    unit_keys=pd.DataFrame({"Brand_Key":corpus["Brand"].map(bkey),"Unit_ID":corpus["Unit_ID"]})
+    if unit_keys.duplicated().any():
+        raise ValueError("같은 브랜드 안에서 Unit_ID가 중복됩니다. 승인 Unit의 식별자를 확인하세요.")
+
+    if "Language" not in corpus.columns:
+        corpus["Language"]=""
+    language=corpus["Language"].fillna("").astype(str)
+    blank_language=language.str.strip().eq("")
+    corpus["Language"]=language
+    corpus.loc[blank_language,"Language"]=corpus.loc[blank_language,"Text"].map(infer_language)
+    info["Language_Inferred_Units"]=int(blank_language.sum())
+    info["Approved_Units"]=len(corpus)
+    return corpus.reset_index(drop=True),info
+
+def read_corpus(source):
+    # String loading preserves IDs such as 001 and literal text such as NA.
+    return prepare_corpus(pd.read_csv(source,dtype=str,keep_default_na=False,encoding="utf-8-sig"))
 
 def resolve_labels(model):
     out={}
@@ -144,6 +221,11 @@ def zip_outputs(files,meta):
         z.writestr("02C_99_metadata.json",json.dumps(meta,ensure_ascii=False,indent=2))
     return bio.getvalue()
 
+missing_files=[path.name for path in (SEED_FILE,VISUAL_FILE,MAPPING_FILE) if not path.is_file()]
+if missing_files:
+    st.error("app.py와 같은 폴더에 고정 분석 CSV가 필요합니다: "+", ".join(missing_files))
+    st.stop()
+
 seed=load_seed()
 visual=load_visual()
 mapping=load_mapping()
@@ -165,18 +247,26 @@ minimum confirmatory N = 15"""
 )
 
 uploaded=st.file_uploader(
-    "최종 confirmation sentence/proposition corpus CSV 업로드",
+    "최종 승인 Content Unit CSV 업로드",
     type=["csv"],
-    help="필수열: Brand, Sentence_Unit_ID, Language, Sentence_Text"
+    help=("필수열: Brand, Unit_ID, Text. 이전 Sentence_Unit_ID/Sentence_Text 형식도 지원합니다. "
+          "Language는 없거나 비어 있으면 자동 생성합니다. "
+          "Researcher_Final 열이 있으면 1인 행만 사용합니다.")
 )
 
 if uploaded is not None:
-    corpus=pd.read_csv(uploaded)
-    required={"Brand","Sentence_Unit_ID","Language","Sentence_Text"}
-    missing=required-set(corpus.columns)
-    if missing:
-        st.error(f"필수 열 누락: {sorted(missing)}")
+    try:
+        corpus,input_info=read_corpus(uploaded)
+    except (ValueError,UnicodeError,pd.errors.ParserError) as exc:
+        st.error(f"CSV 입력 확인: {exc}")
         st.stop()
+
+    if input_info["Legacy_Columns_Mapped"]:
+        st.info("이전 열 이름을 Unit_ID·Text로 변환했습니다. Content Unit은 다시 분할하지 않습니다.")
+    if input_info["Excluded_Unapproved_Units"]:
+        st.info(f"Researcher_Final이 1인 행만 사용합니다. 미승인 {input_info['Excluded_Unapproved_Units']}개 Unit을 제외했습니다.")
+    if input_info["Language_Inferred_Units"]:
+        st.caption("빈 Language 값은 문자 구성으로 추정했습니다(ko/en/mixed/und). 분석 점수에는 사용하지 않습니다.")
 
     allowed={bkey(x) for x in seed["Brand"]}
     corpus["_key"]=corpus["Brand"].map(bkey)
@@ -185,6 +275,9 @@ if uploaded is not None:
         st.error("확인표본 21개 이외 브랜드가 포함되어 있습니다. 개발표본과 섞지 마세요.")
         st.stop()
 
+    # Use the fixed seed spelling so case/spacing variants share one profile.
+    brand_names={bkey(name):name for name in seed["Brand"]}
+    corpus["Brand"]=corpus["_key"].map(brand_names)
     counts=corpus.groupby("Brand").size().rename("N_Units").reset_index()
     st.dataframe(counts,use_container_width=True,hide_index=True)
 
@@ -199,13 +292,13 @@ if uploaded is not None:
         done=0
         # Process one trait at a time for deterministic memory use.
         for j,(_,a) in enumerate(mapping.iterrows()):
-            premises=corpus["Sentence_Text"].astype(str).tolist()
+            premises=corpus["Text"].tolist()
             hyps=[hypotheses[j]]*len(premises)
             vals=nli_entailment(tok,model,device,labels,premises,hyps)
             for idx,val in enumerate(vals):
                 rows.append({
                     "Brand":corpus.iloc[idx]["Brand"],
-                    "Sentence_Unit_ID":corpus.iloc[idx]["Sentence_Unit_ID"],
+                    "Unit_ID":corpus.iloc[idx]["Unit_ID"],
                     "Language":corpus.iloc[idx]["Language"],
                     "Trait":a["Trait"],
                     "Trait_Key":a["Trait_Key"],
@@ -276,6 +369,7 @@ if uploaded is not None:
         st.dataframe(detail.sort_values("Retrieval_Rank"),use_container_width=True,hide_index=True)
 
         files={
+            "02C_00_content_units.csv":corpus.drop(columns=["_key"]),
             "02C_01_unit_trait_scores.csv":unit_trait,
             "02C_02_brand_trait_profiles.csv":brand_trait,
             "02C_03_similarity_matrix.csv":sim_df,
@@ -284,6 +378,8 @@ if uploaded is not None:
         }
         meta={
             "App_Version":APP_VERSION,
+            "Input_Schema":"Content Unit: Brand, Unit_ID, Text; Language optional",
+            "Input_Processing":input_info,
             "Model":MODEL_NAME,
             "Hypothesis":"This brand is {trait}.",
             "Text_Score":"P(entailment)",
