@@ -1,0 +1,8 @@
+streamlit>=1.42,<2
+pandas>=2.2,<3
+numpy>=1.26,<3
+torch>=2.2,<3
+transformers>=4.45,<5
+sentencepiece>=0.2,<1
+safetensors>=0.4,<1
+protobuf>=4,<7

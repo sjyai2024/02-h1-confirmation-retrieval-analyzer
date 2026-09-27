@@ -1,0 +1,43 @@
+﻿Item_No,Dimension,Facet,Trait,Original_Facet_Code,Trait_Key,Facet_Key,Hypothesis_EN,Trait_KO_Predicate_Working,Hypothesis_KO_Working
+1,Sincerity,Down-to-earth,down-to-earth,1a,down_to_earth,down_to_earth,This brand is down-to-earth.,현실적이고 소박하다,이 브랜드의 개성은 현실적이고 소박하다.
+2,Sincerity,Down-to-earth,family-oriented,1a,family_oriented,down_to_earth,This brand is family-oriented.,가족 지향적이다,이 브랜드의 개성은 가족 지향적이다.
+3,Sincerity,Down-to-earth,small-town,1a,small_town,down_to_earth,This brand is small-town.,소박하고 친근하다,이 브랜드의 개성은 소박하고 친근하다.
+4,Sincerity,Honest,honest,1b,honest,honest,This brand is honest.,정직하다,이 브랜드의 개성은 정직하다.
+5,Sincerity,Honest,sincere,1b,sincere,honest,This brand is sincere.,진실하다,이 브랜드의 개성은 진실하다.
+6,Sincerity,Honest,real,1b,real,honest,This brand is real.,진정성 있다,이 브랜드의 개성은 진정성 있다.
+7,Sincerity,Wholesome,wholesome,1c,wholesome,wholesome,This brand is wholesome.,건전하다,이 브랜드의 개성은 건전하다.
+8,Sincerity,Wholesome,original,1c,original,wholesome,This brand is original.,독창적이다,이 브랜드의 개성은 독창적이다.
+9,Sincerity,Cheerful,cheerful,1d,cheerful,cheerful,This brand is cheerful.,쾌활하다,이 브랜드의 개성은 쾌활하다.
+10,Sincerity,Cheerful,sentimental,1d,sentimental,cheerful,This brand is sentimental.,감성적이다,이 브랜드의 개성은 감성적이다.
+11,Sincerity,Cheerful,friendly,1d,friendly,cheerful,This brand is friendly.,친근하다,이 브랜드의 개성은 친근하다.
+12,Excitement,Daring,daring,2a,daring,daring,This brand is daring.,대담하다,이 브랜드의 개성은 대담하다.
+13,Excitement,Daring,trendy,2a,trendy,daring,This brand is trendy.,트렌디하다,이 브랜드의 개성은 트렌디하다.
+14,Excitement,Daring,exciting,2a,exciting,daring,This brand is exciting.,흥미진진하다,이 브랜드의 개성은 흥미진진하다.
+15,Excitement,Spirited,spirited,2b,spirited,spirited,This brand is spirited.,활기차다,이 브랜드의 개성은 활기차다.
+16,Excitement,Spirited,cool,2b,cool,spirited,This brand is cool.,쿨하고 멋지다,이 브랜드의 개성은 쿨하고 멋지다.
+17,Excitement,Spirited,young,2b,young,spirited,This brand is young.,젊다,이 브랜드의 개성은 젊다.
+18,Excitement,Imaginative,imaginative,2c,imaginative,imaginative,This brand is imaginative.,상상력이 풍부하다,이 브랜드의 개성은 상상력이 풍부하다.
+19,Excitement,Imaginative,unique,2c,unique,imaginative,This brand is unique.,독특하다,이 브랜드의 개성은 독특하다.
+20,Excitement,Up-to-date,up-to-date,2d,up_to_date,up_to_date,This brand is up-to-date.,최신 감각이 있다,이 브랜드의 개성은 최신 감각이 있다.
+21,Excitement,Up-to-date,independent,2d,independent,up_to_date,This brand is independent.,독립적이다,이 브랜드의 개성은 독립적이다.
+22,Excitement,Up-to-date,contemporary,2d,contemporary,up_to_date,This brand is contemporary.,현대적이다,이 브랜드의 개성은 현대적이다.
+23,Competence,Reliable,reliable,3a,reliable,reliable,This brand is reliable.,신뢰할 수 있다,이 브랜드의 개성은 신뢰할 수 있다.
+24,Competence,Reliable,hard working,3a,hard_working,reliable,This brand is hard working.,성실하다,이 브랜드의 개성은 성실하다.
+25,Competence,Reliable,secure,3a,secure,reliable,This brand is secure.,안정적이다,이 브랜드의 개성은 안정적이다.
+26,Competence,Intelligent,intelligent,3b,intelligent,intelligent,This brand is intelligent.,지적이다,이 브랜드의 개성은 지적이다.
+27,Competence,Intelligent,technical,3b,technical,intelligent,This brand is technical.,기술적이다,이 브랜드의 개성은 기술적이다.
+28,Competence,Intelligent,corporate,3b,corporate,intelligent,This brand is corporate.,전문적인 기업 이미지를 가진다,이 브랜드의 개성은 전문적인 기업 이미지를 가진다.
+29,Competence,Successful,successful,3c,successful,successful,This brand is successful.,성공적이다,이 브랜드의 개성은 성공적이다.
+30,Competence,Successful,leader,3c,leader,successful,This brand is leader.,선도적이다,이 브랜드의 개성은 선도적이다.
+31,Competence,Successful,confident,3c,confident,successful,This brand is confident.,자신감 있다,이 브랜드의 개성은 자신감 있다.
+32,Sophistication,Upper class,upper class,4a,upper_class,upper_class,This brand is upper class.,고급스럽고 상류층 이미지를 가진다,이 브랜드의 개성은 고급스럽고 상류층 이미지를 가진다.
+33,Sophistication,Upper class,glamorous,4a,glamorous,upper_class,This brand is glamorous.,화려하다,이 브랜드의 개성은 화려하다.
+34,Sophistication,Upper class,good looking,4a,good_looking,upper_class,This brand is good looking.,보기 좋고 매력적이다,이 브랜드의 개성은 보기 좋고 매력적이다.
+35,Sophistication,Charming,charming,4b,charming,charming,This brand is charming.,매력적이다,이 브랜드의 개성은 매력적이다.
+36,Sophistication,Charming,feminine,4b,feminine,charming,This brand is feminine.,여성스럽다,이 브랜드의 개성은 여성스럽다.
+37,Sophistication,Charming,smooth,4b,smooth,charming,This brand is smooth.,부드럽고 세련되다,이 브랜드의 개성은 부드럽고 세련되다.
+38,Ruggedness,Outdoorsy,outdoorsy,5a,outdoorsy,outdoorsy,This brand is outdoorsy.,야외 활동적이다,이 브랜드의 개성은 야외 활동적이다.
+39,Ruggedness,Outdoorsy,masculine,5a,masculine,outdoorsy,This brand is masculine.,남성적이다,이 브랜드의 개성은 남성적이다.
+40,Ruggedness,Outdoorsy,Western,5a,western,outdoorsy,This brand is Western.,미국 서부적인 이미지를 가진다,이 브랜드의 개성은 미국 서부적인 이미지를 가진다.
+41,Ruggedness,Tough,tough,5b,tough,tough,This brand is tough.,강인하다,이 브랜드의 개성은 강인하다.
+42,Ruggedness,Tough,rugged,5b,rugged,tough,This brand is rugged.,거칠고 강건하다,이 브랜드의 개성은 거칠고 강건하다.

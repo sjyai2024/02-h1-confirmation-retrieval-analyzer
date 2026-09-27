@@ -1,0 +1,22 @@
+﻿Brand,Eligibility,Seed_URL,URL_Status,Source_Note,Research_Note
+THE SAEM,A,https://www.thesaemcosmetic.com/en/brand/,Ready,existing official brand page,
+CNP Laboratory,A,https://cnpmall.com/about/about.html,Ready,existing official brand page,
+peripera,A,https://www.cliocosmetic.com/peripera.html,Verified_2026-09-27,CLIO Cosmetics official brand portal,
+THE WHOO,A,https://thewhoo.com/,Ready,existing official brand site,
+DOMINAS,A,https://dominas.co.kr/,Ready,existing official brand site,
+SOME BY MI,A,https://en.somebymi.com/brand/story.html,Ready,existing official brand story,
+STEMBELL,A,https://stembell.co.kr/,Ready,existing official brand site,robots/JS 가능
+medicube,A,https://medicube.global/about/,Ready,existing official about page,robots 가능
+fromrier,A,https://fromrier.com/shopinfo/company.html,Verified_2026-09-27,official company/brand page located,
+AMUSE,A,https://amusemakeup.kr/,Ready,existing official brand site,브랜드 철학 텍스트량 확인
+numbuzin,A,https://numbuzin.com/,Verified_2026-09-27,official site; brand story menu visible,crawler가 brand story 링크 탐색
+celimax,A,https://www.celimax.com/brand,Ready,existing official brand page,
+VDL,A,https://www.vdlcosmetics.com/story/about.jsp,Ready,existing official about page,
+TIELA,A,https://tiela.co.kr/,Ready,existing official brand site,텍스트량 짧을 가능성
+farmrx,A,https://www.lghnh.com/brand/detail.jsp?bid1=C114&gbn=1,Ready,LG H&H official brand page,shared-domain cross-brand contamination 주의
+Dr.Jart+,A,https://www.drjart.co.kr/about,Ready,existing official about page,403/JS 가능
+LABO-H,A,https://www.laboh.co.kr/,Ready,existing official brand site,iframe/동적 로딩 가능
+ISA KNOX,A,https://www.lghnh.com/brand/detail.jsp?bid1=C054&gbn=1,Ready,LG H&H official brand page,shared-domain cross-brand contamination 주의
+beplain,A,https://www.beplain.co.kr/,Ready,existing official brand site,mojibake 여부 확인
+CLIO,A,https://www.cliocosmetic.com/clio.html,Verified_2026-09-27,CLIO Cosmetics official brand portal,
+TPSY,A,https://www.lghnh.com/global/brand/detail.jsp?bid1=C099&gbn=1,Verified_2026-09-27,LG H&H official TPSY brand page,
