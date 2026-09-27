@@ -12,32 +12,18 @@ import streamlit as st
 import torch
 from transformers import AutoModelForSequenceClassification, AutoTokenizer
 
-APP_VERSION="1.1"
+APP_VERSION="1.2"
 APP_DIR=Path(__file__).resolve().parent
 MODEL_NAME="MoritzLaurer/mDeBERTa-v3-base-mnli-xnli"
-VISUAL_FILE=APP_DIR/"H1_confirmation_21_CLIP_42trait_FROZEN.csv"
-SEED_FILE=APP_DIR/"H1_confirmation_set_21_seed.csv"
 MAPPING_FILE=APP_DIR/"Aaker42_NLI_hypothesis_mapping.csv"
 
 PRIMARY_PERMUTATIONS=100000
 RANDOM_SEED=20260927
 
-st.set_page_config(page_title="02C H1 Confirmation Retrieval",layout="wide")
-st.title("02C · H1 독립 확인표본 Retrieval Test")
-st.caption("개발표본 31개와 분리된 A등급 21개 브랜드에서 mDeBERTa Text 42-trait ↔ frozen CLIP wordmark 42-trait를 단 한 번 확인")
-
-st.warning(
-    "이 앱은 **확인표본(confirmatory set)** 전용입니다. "
-    "모델, prompt, visual profile, primary metric은 고정되어 있으며 화면에서 선택할 수 없습니다."
-)
-
-@st.cache_data
-def load_seed():
-    return pd.read_csv(SEED_FILE)
-
-@st.cache_data
-def load_visual():
-    return pd.read_csv(VISUAL_FILE)
+st.set_page_config(page_title="02C Uploaded Sample Retrieval",layout="wide")
+st.title("02C · 업로드 표본 Text–Visual Retrieval 분석")
+st.caption("승인 CSV의 브랜드를 기준으로 텍스트와 CLIP 로고 프로파일의 대응성을 분석합니다.")
+st.info("표본 수는 업로드 파일에서 계산합니다. 기존 개발·탐색 데이터를 사용한 결과는 독립 확인표본 검정으로 해석하지 않습니다.")
 
 @st.cache_data
 def load_mapping():
@@ -123,6 +109,21 @@ def prepare_corpus(data):
 def read_corpus(source):
     # String loading preserves IDs such as 001 and literal text such as NA.
     return prepare_corpus(pd.read_csv(source,dtype=str,keep_default_na=False,encoding="utf-8-sig"))
+
+def validate_visual(frame,trait_keys):
+    frame=frame.copy()
+    required=["Brand"]+["Raw_"+key for key in trait_keys]
+    missing=set(required)-set(frame.columns)
+    if missing:
+        raise ValueError("시각 프로파일 필수열 누락: "+", ".join(sorted(missing)))
+    if frame.empty or frame["Brand"].isna().any() or frame["Brand"].astype(str).str.strip().eq("").any():
+        raise ValueError("시각 결과의 브랜드명이 비어 있습니다.")
+    if frame["Brand"].map(bkey).duplicated().any():
+        raise ValueError("시각 결과에 같은 브랜드가 중복됩니다. 브랜드별 프로파일 한 행이 필요합니다.")
+    frame[required[1:]]=frame[required[1:]].apply(pd.to_numeric,errors="raise")
+    if not np.isfinite(frame[required[1:]].to_numpy(float)).all():
+        raise ValueError("시각 점수에 결측 또는 무한값이 있습니다.")
+    return frame
 
 def resolve_labels(model):
     out={}
@@ -221,30 +222,50 @@ def zip_outputs(files,meta):
         z.writestr("02C_99_metadata.json",json.dumps(meta,ensure_ascii=False,indent=2))
     return bio.getvalue()
 
-missing_files=[path.name for path in (SEED_FILE,VISUAL_FILE,MAPPING_FILE) if not path.is_file()]
-if missing_files:
-    st.error("app.py와 같은 폴더에 고정 분석 CSV가 필요합니다: "+", ".join(missing_files))
+if not MAPPING_FILE.is_file():
+    st.error("app.py와 같은 폴더에 Aaker42_NLI_hypothesis_mapping.csv가 필요합니다.")
     st.stop()
-
-seed=load_seed()
-visual=load_visual()
 mapping=load_mapping()
-
-st.markdown("### 고정된 확인표본")
-st.dataframe(seed[["Brand","Seed_URL","URL_Status"]],use_container_width=True,hide_index=True)
-
-st.markdown("### 고정 분석규칙")
-st.code(
-"""Text model: MoritzLaurer/mDeBERTa-v3-base-mnli-xnli
-Hypothesis: This brand is {trait}.
-Score: P(entailment)
-Visual: frozen generic CLIP wordmark 42-trait
-Primary similarity: Pearson r across raw 42-trait profiles
-Primary H1 statistic: Mean Retrieval Rank
-Permutation: 100,000 one-sided
-alpha = .05
-minimum confirmatory N = 15"""
-)
+trait_keys=mapping["Trait_Key"].tolist()
+if len(trait_keys)!=42 or len(set(trait_keys))!=42:
+    st.error("매핑 파일에는 중복 없이 42개 Trait_Key가 필요합니다.")
+    st.stop()
+st.markdown("### 분석규칙")
+st.code("Text: mDeBERTa NLI · This brand is {trait}. · P(entailment)\nVisual: CLIP raw 42-trait\nSimilarity: Pearson r · Mean Retrieval Rank\nPermutation: 100,000 one-sided · alpha=.05\nN: 업로드 텍스트와 시각 결과의 공통 브랜드 수")
+visual_upload=st.file_uploader("전체 브랜드 CLIP raw 42-trait 결과 CSV 또는 ZIP",type=["csv","zip"],key="visual")
+visual=None
+visual_source=""
+if visual_upload is not None:
+    try:
+        if visual_upload.name.lower().endswith(".zip"):
+            with zipfile.ZipFile(visual_upload) as archive:
+                candidates={}
+                for name in archive.namelist():
+                    if name.lower().endswith(".csv"):
+                        frame=pd.read_csv(io.BytesIO(archive.read(name)))
+                        if {"Brand",*("Raw_"+key for key in trait_keys)}.issubset(frame.columns):
+                            candidates[name]=frame
+                if not candidates:
+                    raise ValueError("ZIP에 Brand 및 Raw_<Trait_Key> 42개 열을 가진 CSV가 없습니다. 원점수 프로파일 CSV를 사용하세요.")
+                chosen=st.selectbox("시각 프로파일 파일",list(candidates))
+                visual=candidates[chosen]
+                visual_source=visual_upload.name+"/"+chosen
+        else:
+            visual=pd.read_csv(visual_upload)
+            visual_source=visual_upload.name
+        visual=validate_visual(visual,trait_keys)
+        if "Eligibility" in visual.columns:
+            quality_scope=st.selectbox("로고 등급 범위",["모든 등급 (탐색용)","A등급만 (기존 기준)"])
+            if quality_scope.startswith("A등급"):
+                visual=visual.loc[visual["Eligibility"].astype(str).str.strip().str.upper().eq("A")].copy()
+        else:
+            quality_scope="등급 정보 없음"
+            st.warning("시각 파일에 Eligibility가 없어 로고 등급을 확인할 수 없습니다.")
+    except (ValueError,UnicodeError,zipfile.BadZipFile,pd.errors.ParserError) as exc:
+        st.error(f"시각 결과 입력 확인: {exc}")
+        st.stop()
+else:
+    st.caption("기존 21개 전용 시각 파일은 자동 사용하지 않습니다. 업로드 텍스트의 브랜드를 포함한 전체 CLIP 결과를 선택하세요.")
 
 uploaded=st.file_uploader(
     "최종 승인 Content Unit CSV 업로드",
@@ -268,20 +289,28 @@ if uploaded is not None:
     if input_info["Language_Inferred_Units"]:
         st.caption("빈 Language 값은 문자 구성으로 추정했습니다(ko/en/mixed/und). 분석 점수에는 사용하지 않습니다.")
 
-    allowed={bkey(x) for x in seed["Brand"]}
     corpus["_key"]=corpus["Brand"].map(bkey)
-    extra=sorted(set(corpus["_key"])-allowed)
-    if extra:
-        st.error("확인표본 21개 이외 브랜드가 포함되어 있습니다. 개발표본과 섞지 마세요.")
-        st.stop()
-
-    # Use the fixed seed spelling so case/spacing variants share one profile.
-    brand_names={bkey(name):name for name in seed["Brand"]}
+    brand_names=corpus.drop_duplicates("_key").set_index("_key")["Brand"].to_dict()
     corpus["Brand"]=corpus["_key"].map(brand_names)
     counts=corpus.groupby("Brand").size().rename("N_Units").reset_index()
+    n_input=len(brand_names)
+    st.success(f"입력 표본: {n_input}개 브랜드 · 승인 Content Unit {len(corpus)}개")
     st.dataframe(counts,use_container_width=True,hide_index=True)
-
-    if st.button("H1 확인분석 실행",type="primary"):
+    if visual is None:
+        st.info("텍스트 CSV를 읽었습니다. 비교할 전체 브랜드 CLIP 결과도 업로드하세요.")
+        st.stop()
+    visual["_key"]=visual["Brand"].map(bkey)
+    common_keys=set(corpus["_key"]) & set(visual["_key"])
+    coverage=counts.copy()
+    coverage["Visual_Available"]=coverage["Brand"].map(bkey).isin(common_keys)
+    st.dataframe(coverage,use_container_width=True,hide_index=True)
+    st.info(f"텍스트 {n_input}개 / 시각 결과와 공통 {len(common_keys)}개 / 시각 결과 누락 {n_input-len(common_keys)}개")
+    if len(common_keys)<2:
+        st.error("브랜드 간 비교에는 공통 브랜드가 최소 2개 필요합니다. 이는 검정력 기준이 아닌 계산상의 최소 조건입니다.")
+        st.stop()
+    if len(common_keys)<n_input:
+        st.warning("시각 결과가 없는 브랜드는 텍스트 분석에는 포함되지만 Text–Visual 비교에서는 제외됩니다.")
+    if st.button("업로드 표본 분석 실행",type="primary"):
         tok,model,device,labels=load_model()
         trait_keys=mapping["Trait_Key"].tolist()
         hypotheses=[f"This brand is {t}." for t in mapping["Trait"]]
@@ -312,23 +341,22 @@ if uploaded is not None:
         brand_trait=(unit_trait.groupby(["Brand","Trait_Key"],as_index=False)["Entailment_Prob"].mean()
                      .pivot(index="Brand",columns="Trait_Key",values="Entailment_Prob").reset_index())
 
-        # Align to frozen visuals, preserving exact brand pairing.
+        # Align uploaded visual profiles by brand key.
         T=brand_trait.copy(); V=visual.copy()
         T["_key"]=T["Brand"].map(bkey); V["_key"]=V["Brand"].map(bkey)
         common=sorted(set(T["_key"])&set(V["_key"]))
         T=T.set_index("_key").loc[common].reset_index()
         V=V.set_index("_key").loc[common].reset_index()
 
-        if len(common)<15:
-            status="UNDER-SIZED CONFIRMATION"
-            st.error(f"분석가능 브랜드 {len(common)}개 < 15개. Confirmatory 판정으로 사용하지 않습니다.")
-        else:
-            status="CONFIRMATORY"
+        status="UPLOADED_SAMPLE_EXPLORATORY"
 
         text_cols=trait_keys
         visual_cols=["Raw_"+x for x in trait_keys]
         A=T[text_cols].to_numpy(float)
         B=V[visual_cols].to_numpy(float)
+        if not np.isfinite(A).all() or not np.isfinite(B).all() or np.any(np.std(A,axis=1)<1e-12) or np.any(np.std(B,axis=1)<1e-12):
+            st.error("공통 브랜드에 결측·무한값 또는 분산이 0인 프로파일이 있어 Pearson 비교를 중단했습니다.")
+            st.stop()
         M=similarity_matrix(A,B)
 
         ranks,mean_rank,perm_mean,p_rank=permutation_mean_rank(M)
@@ -347,7 +375,9 @@ if uploaded is not None:
         n=len(detail)
         summary=pd.DataFrame([{
             "Status":status,
-            "N_Confirmed_Brands":n,
+            "N_Input_Brands":n_input,
+            "N_Matched_Brands":n,
+            "N_Units":len(corpus),
             "Mean_Retrieval_Rank":mean_rank,
             "Random_Expected_Mean_Rank":(n+1)/2,
             "Permutation_N":PRIMARY_PERMUTATIONS,
@@ -359,12 +389,12 @@ if uploaded is not None:
             "Matched_Mean_Profile_r":matched_r,
             "Nonmatching_Mean_Profile_r":nonmatched_r,
             "Secondary_Profile_r_p":p_r,
-            "H1_Supported_Primary":bool(status=="CONFIRMATORY" and p_rank<0.05 and mean_rank<(n+1)/2),
+            "Exploratory_Primary_Significant":bool(p_rank<0.05 and mean_rank<(n+1)/2),
         }])
 
         sim_df=pd.DataFrame(M,index=T["Brand"],columns=V["Brand"]).reset_index(names="Text_Brand")
 
-        st.header("Confirmation 결과")
+        st.header("업로드 표본 분석 결과")
         st.dataframe(summary,use_container_width=True,hide_index=True)
         st.dataframe(detail.sort_values("Retrieval_Rank"),use_container_width=True,hide_index=True)
 
@@ -374,7 +404,8 @@ if uploaded is not None:
             "02C_02_brand_trait_profiles.csv":brand_trait,
             "02C_03_similarity_matrix.csv":sim_df,
             "02C_04_brand_retrieval_detail.csv":detail,
-            "02C_05_confirmation_summary.csv":summary,
+            "02C_05_uploaded_sample_summary.csv":summary,
+            "02C_06_brand_coverage.csv":coverage,
         }
         meta={
             "App_Version":APP_VERSION,
@@ -383,18 +414,22 @@ if uploaded is not None:
             "Model":MODEL_NAME,
             "Hypothesis":"This brand is {trait}.",
             "Text_Score":"P(entailment)",
-            "Visual_Profile":"frozen generic CLIP wordmark raw 42-trait",
+            "Visual_Profile":"uploaded CLIP wordmark raw 42-trait",
+            "Visual_Source":visual_source,
+            "Visual_Quality_Scope":quality_scope,
+            "N_Input_Brands":n_input,
+            "N_Matched_Brands":n,
             "Primary_Similarity":"Pearson r across raw 42-trait profiles",
             "Primary_Statistic":"Mean Retrieval Rank",
             "Permutation_N":PRIMARY_PERMUTATIONS,
             "Permutation_Seed":RANDOM_SEED,
             "Alpha":0.05,
-            "Minimum_Confirmatory_N":15,
+            "Independent_Confirmation":False,
             "Status":status,
         }
         st.download_button(
-            "Confirmation 결과 ZIP 다운로드",
+            "업로드 표본 결과 ZIP 다운로드",
             data=zip_outputs(files,meta),
-            file_name="02C_H1_confirmation_retrieval_results.zip",
+            file_name="02C_uploaded_sample_retrieval_results.zip",
             mime="application/zip"
         )
